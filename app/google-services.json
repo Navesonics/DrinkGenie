@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "529559826923",
+    "project_id": "drinkgenie-2dd98",
+    "storage_bucket": "drinkgenie-2dd98.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:529559826923:android:f107f6787ea0550c3d69ae",
+        "android_client_info": {
+          "package_name": "com.jbsolutions.drinkgenie"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEqX_I9Gfi3P2YoL1aUh_4MaZ7PYuareg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
