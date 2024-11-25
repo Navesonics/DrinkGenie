@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:529559826923:android:f107f6787ea0550c3d69ae",
+        "mobilesdk_app_id": "1:529559826923:android:589f0c4fdc2e81ba3d69ae",
         "android_client_info": {
-          "package_name": "com.jbsolutions.drinkgenie"
+          "package_name": "com.jbsolutions.drinkgenieapp"
         }
       },
       "oauth_client": [],
