@@ -1,15 +1,14 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.gms.google-services")
 }
 
 android {
-    namespace = "com.jbsolutions.drinkgenie"
+    namespace = "com.jbsolutions.drinkgenieapp"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.jbsolutions.drinkgenie"
+        applicationId = "com.jbsolutions.drinkgenieapp"
         minSdk = 30
         targetSdk = 34
         versionCode = 1
@@ -35,7 +34,6 @@ android {
         jvmTarget = "1.8"
     }
 }
-
 dependencies {
     // Core Android libraries
     implementation("androidx.core:core-ktx:1.13.1")
@@ -53,9 +51,9 @@ dependencies {
     implementation("com.google.firebase:firebase-storage-ktx")
 
     // MVVM architecture components
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.1")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.6.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
 
     // Unit testing
     testImplementation("junit:junit:4.13.2")
@@ -63,6 +61,5 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 
     // Optional: RecyclerView (for displaying lists of drinks)
-    implementation("androidx.recyclerview:recyclerview:1.3.0")
-
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 }
