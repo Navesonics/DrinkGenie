@@ -14,17 +14,19 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DrinkGenieApp"
         tools:targetApi="31">
-
+        <activity
+            android:name=".view.activities.SignUpActivity"
+            android:exported="false" />
         <!-- LoginActivity as Launcher -->
-        <activity android:name=".view.activities.LoginActivity"
+        <activity
+            android:name=".view.activities.LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-
-        <!-- MainActivity for post-login navigation -->
+        </activity> <!-- MainActivity for post-login navigation -->
         <activity
             android:name=".view.activities.MainActivity"
             android:exported="true" />

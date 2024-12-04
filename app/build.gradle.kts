@@ -34,6 +34,11 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+
+    buildFeatures {
+        viewBinding = true
+    }
+
 }
 dependencies {
     // Core Android libraries
@@ -48,7 +53,7 @@ dependencies {
     // Firebase services
     implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx:24.8.0")
     implementation("com.google.firebase:firebase-storage-ktx")
 
     // MVVM architecture components
@@ -66,4 +71,6 @@ dependencies {
 
     // Optional: RecyclerView (for displaying lists of drinks)
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("com.github.bumptech.glide:glide:4.15.1")
+    //kapt("com.github.bumptech.glide:compiler:4.15.1")
 }

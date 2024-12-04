@@ -19,8 +19,10 @@
         app:tabMaxWidth="0dp"
         app:tabGravity="fill"
         app:tabMode="fixed"
-        android:background="@color/light_purple"
-        app:tabIndicator="@color/light_orange"
+        android:background="@color/pastel_blue"
+        app:tabIndicator="@color/pastel_orange"
+        app:tabSelectedTextColor="@color/pastel_dark_text"
+        app:tabTextColor="@color/pastel_medium_text"
         android:layout_alignParentBottom="true">
 
         <com.google.android.material.tabs.TabItem
