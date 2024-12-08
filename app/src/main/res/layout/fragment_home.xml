@@ -1,18 +1,105 @@
-<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/theme_skyblue"
-    tools:context=".view.fragments.HomeFragment">
+    tools:context=".view.activities.MainActivity">
 
+    <!-- Categories Label -->
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="Home Fragment"
-        android:textSize="30sp"
-        android:textAlignment="center"
-        android:gravity="center"
-        android:textColor="@color/black"/>
+        android:id="@+id/categoriesLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Categories"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="start"
+        android:layout_alignParentStart="true"
+        android:layout_marginTop="16dp"
+        android:layout_marginLeft="16dp" />
 
-</FrameLayout>
+    <!-- Category Images (Scrollable) -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/categoriesLabel"
+        android:layout_marginTop="20dp"
+        android:scrollbars="horizontal"
+        android:id="@+id/categoryImagesContainerView">
+
+        <LinearLayout
+            android:id="@+id/categoryImagesContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="start">
+            <!-- Category images will be added dynamically -->
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Random Cocktail Container -->
+    <LinearLayout
+        android:id="@+id/randomCocktailContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_below="@id/categoryImagesContainerView"
+        android:layout_above="@id/tabLayout"
+    android:layout_marginTop="20dp"
+    android:layout_marginBottom="16dp"
+    android:padding="16dp"
+    android:background="@drawable/embossed_background"
+    android:elevation="8dp"
+    android:layout_centerHorizontal="true"
+    android:layout_marginHorizontal="16dp">
+
+    <!-- Random Label -->
+    <TextView
+        android:id="@+id/randomLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Genie give me something!"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginTop="20dp"
+        android:textColor="#FFFFFF" />
+
+    <!-- Random Cocktail Image -->
+    <ImageView
+        android:id="@+id/randomDrinkImage"
+        android:layout_width="147dp"
+        android:layout_height="228dp"
+        android:layout_marginTop="16dp"
+        android:contentDescription="Cocktail Image"
+        android:src="@drawable/ic_launcher_background" />
+
+    <!-- Cocktail Name -->
+    <TextView
+        android:id="@+id/randomDrinkName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Cocktail Name"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginTop="16dp"
+        android:textColor="#FFFFFF" />
+
+
+    <!-- Refresh Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/refreshButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Get Random Cocktail"
+            android:layout_marginTop="20dp"
+            android:backgroundTint="@color/pastel_orange"
+            android:textColor="@color/white"
+            android:layout_gravity="center" />
+
+    </LinearLayout>
+
+
+    </RelativeLayout>

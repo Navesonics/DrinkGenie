@@ -11,7 +11,7 @@
     <!-- This is where the HomeFragment will be loaded -->
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/fragment_container"
-        android:name="com.jbsolutions.drinkgenieapp.view.fragments.HomeFragment"
+        android:name="com.jbsolutions.drinkgenieapp.view.fragments.DrinksFragment"
         android:layout_width="match_parent"
         android:layout_height="0dp"
     android:layout_weight="1" />

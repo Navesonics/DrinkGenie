@@ -17,6 +17,12 @@
         <activity
             android:name=".view.activities.SignUpActivity"
             android:exported="false" />
+        <activity
+            android:name=".view.activities.MainActivity"
+            android:exported="false" />
+        <activity
+            android:name=".view.activities.DrinksActivity"
+            android:exported="false" />
         <!-- LoginActivity as Launcher -->
         <activity
             android:name=".view.activities.LoginActivity"
@@ -26,10 +32,8 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity> <!-- MainActivity for post-login navigation -->
-        <activity
-            android:name=".view.activities.MainActivity"
-            android:exported="true" />
+        </activity>
+
     </application>
 
 </manifest>

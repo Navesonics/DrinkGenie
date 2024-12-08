@@ -1,292 +1,156 @@
-package com.jbsolutions.drinkgenieapp.viewmodel
+package com.jbsolutions.drinkgenieapp.viewmodels
 
-import android.util.Log
-import androidx.lifecycle.LiveData
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
-import com.google.gson.Gson
-import com.jbsolutions.drinkgenieapp.model.Drink
-import com.jbsolutions.drinkgenieapp.model.Category
-import com.jbsolutions.drinkgenieapp.model.CocktailResponse
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
+import com.jbsolutions.drinkgenieapp.model.Drink
 
-class MainViewModel : ViewModel() {
+class DrinkViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val _categories = MutableLiveData<List<Category>>()
-    val categories: LiveData<List<Category>> get() = _categories
+    val drinksList = MutableLiveData<List<Drink>>() // Change to List<Drink> instead of List<String>
+    val isLoading = MutableLiveData<Boolean>()
+    val errorMessage = MutableLiveData<String>()
+    val drinkDetails = MutableLiveData<Drink?>()
 
-    private val _drinks = MutableLiveData<List<Drink>>()
-    val drinks: LiveData<List<Drink>> get() = _drinks
+    private val client = OkHttpClient()
 
-    private val _randomDrink = MutableLiveData<Drink>()
-    val randomDrink: LiveData<Drink> get() = _randomDrink
+    // Fetch drinks based on query and filter
+    fun fetchDrinks(query: String, filter: String) {
+        isLoading.value = true
+        val formattedQuery = query.replace(" ", "_") // Replace spaces with underscores
 
-    // Fetch categories from the API
-    fun fetchCategories() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val url = URL("https://www.thecocktaildb.com/api/json/v1/1/list.php?c=list")
-                val urlConnection = url.openConnection() as HttpURLConnection
-                urlConnection.requestMethod = "GET"
-                urlConnection.connect()
-
-                val responseCode = urlConnection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    val reader = BufferedReader(InputStreamReader(urlConnection.inputStream))
-                    val response = StringBuilder()
-                    var line: String?
-
-                    while (reader.readLine().also { line = it } != null) {
-                        response.append(line)
-                    }
-
-                    val responseBody = response.toString()
-                    parseCategoriesResponse(responseBody)
-                } else {
-                    Log.e("MainViewModel", "Error fetching categories: $responseCode")
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error fetching categories: ${e.message}")
-            }
+        val url = when (filter) {
+            "Category" -> "https://www.thecocktaildb.com/api/json/v1/1/filter.php?c=$formattedQuery"
+            "Ingredient" -> "https://www.thecocktaildb.com/api/json/v1/1/filter.php?i=$formattedQuery"
+            else -> "https://www.thecocktaildb.com/api/json/v1/1/search.php?s=$formattedQuery"
         }
-    }
 
-    fun fetchDrinksForCategory(category: Category) {
-        CoroutineScope(Dispatchers.IO).launch {
+
+        // Make network request to fetch drinks
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val category_clean = category.name.replace(" ", "_")
+                val request = Request.Builder().url(url).build()
+                val response = client.newCall(request).execute()
 
-                val url = URL("https://www.thecocktaildb.com/api/json/v1/1/filter.php?c=$category_clean")
-                val urlConnection = url.openConnection() as HttpURLConnection
-                urlConnection.requestMethod = "GET"
-                urlConnection.connect()
+                if (response.isSuccessful) {
+                    val responseData = response.body?.string() ?: ""
+                    val jsonResponse = JSONObject(responseData)
 
-                val responseCode = urlConnection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    val reader = BufferedReader(InputStreamReader(urlConnection.inputStream))
-                    val response = StringBuilder()
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        response.append(line)
-                    }
+                    val drinksArray = jsonResponse.optJSONArray("drinks")
+                    if (drinksArray != null) {
+                        val drinks = mutableListOf<Drink>() // Change to List<Drink>
+                        for (i in 0 until drinksArray.length()) {
+                            val drink = drinksArray.getJSONObject(i)
+                            val drinkName = drink.optString("strDrink")
+                            val drinkId = drink.optString("idDrink")
+                            val drinkThumb = drink.optString("strDrinkThumb")
 
-                    val responseBody = response.toString()
+                            // Create a Drink object and add it to the list
+                            drinks.add(Drink(
+                                idDrink = drinkId,
+                                strDrink = drinkName,
+                                strDrinkThumb = drinkThumb,
+                                strCategory = "",
+                                strInstructions = "",
+                                ingredients = emptyList(),
+                                measures = emptyList()
+                            ))
+                        }
 
-                    val jsonObject = JSONObject(responseBody)
-                    val drinksArray = jsonObject.getJSONArray("drinks")
-
-                    val firstDrinkThumb = if (drinksArray.length() > 0) {
-                        drinksArray.getJSONObject(0).getString("strDrinkThumb")
+                        withContext(Dispatchers.Main) {
+                            drinksList.value = drinks
+                            isLoading.value = false
+                        }
                     } else {
-                        null
+                        withContext(Dispatchers.Main) {
+                            isLoading.value = false
+                            errorMessage.value = "No drinks found"
+                        }
                     }
-
-                    if (!firstDrinkThumb.isNullOrEmpty()) {
-                        category.imageUrl = firstDrinkThumb
-                    }
-
-                    updateCategory(category)
-                }
-
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error fetching drinks: ${e.message}")
-            }
-        }
-    }
-
-    fun updateCategory(updatedCategory: Category) {
-        val currentCategories = _categories.value?.toMutableList() ?: mutableListOf()
-        val categoryIndex = currentCategories.indexOfFirst { it.name == updatedCategory.name }
-
-        if (categoryIndex != -1) {
-            currentCategories[categoryIndex] = updatedCategory
-        } else {
-            currentCategories.add(updatedCategory)
-        }
-
-        _categories.postValue(currentCategories)
-    }
-
-    private fun parseCategoriesResponse(responseBody: String) {
-        try {
-            val jsonObject = JSONObject(responseBody)
-            val categoriesArray = jsonObject.getJSONArray("drinks")
-            val categoriesList = mutableListOf<Category>()
-
-            for (i in 0 until categoriesArray.length()) {
-                val category = categoriesArray.getJSONObject(i)
-                val name = category.getString("strCategory")
-                val imageUrl = category.optString("strCategoryThumb", null)
-
-                categoriesList.add(Category(name, imageUrl))
-            }
-
-            _categories.postValue(categoriesList)
-        } catch (e: Exception) {
-            Log.e("MainViewModel", "Error parsing categories response: ${e.message}")
-        }
-    }
-
-    fun fetchDrinksByCategory(url: String) {
-        Thread {
-            var connection: HttpURLConnection? = null
-            try {
-                val urlObject = URL(url)
-                connection = urlObject.openConnection() as HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-
-                val responseCode = connection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    val inputStream = connection.inputStream
-                    val reader = BufferedReader(InputStreamReader(inputStream))
-                    val response = StringBuilder()
-
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        response.append(line)
-                    }
-
-                    reader.close()
-
-                    val drinksResponse = Gson().fromJson(response.toString(), CocktailResponse::class.java)
-
-                    _drinks.postValue(drinksResponse.drinks)
                 } else {
-                    Log.e("API Error", "Failed to fetch drinks. Response code: $responseCode")
-                }
-            } catch (e: Exception) {
-                Log.e("API Error", "Request failed", e)
-            } finally {
-                connection?.disconnect()
-            }
-        }.start()
-    }
-
-    private fun parseDrinksResponse(responseBody: String) {
-        try {
-            val jsonObject = JSONObject(responseBody)
-            val drinksArray = jsonObject.getJSONArray("drinks")
-            val drinksList = mutableListOf<Drink>()
-
-            for (i in 0 until drinksArray.length()) {
-                val drinkObject = drinksArray.getJSONObject(i)
-
-                val idDrink = drinkObject.getString("idDrink")
-                val strCategory = drinkObject.optString("strCategory", null)
-                val strDrink = drinkObject.getString("strDrink")
-                val strInstructions = drinkObject.optString("strInstructions", null)
-                val strDrinkThumb = drinkObject.getString("strDrinkThumb")
-
-                val ingredients = mutableListOf<String>()
-                val measures = mutableListOf<String>()
-                for (j in 1..15) {
-                    val ingredient = drinkObject.optString("strIngredient$j", null)
-                    val measure = drinkObject.optString("strMeasure$j", null)
-
-                    if (ingredient != null) {
-                        ingredients.add(ingredient)
-                        measures.add(measure ?: "")
+                    withContext(Dispatchers.Main) {
+                        isLoading.value = false
+                        errorMessage.value = "Error: ${response.code}"
                     }
                 }
-
-                val drink = Drink(
-                    idDrink = idDrink,
-                    strCategory = strCategory,
-                    strDrink = strDrink,
-                    strInstructions = strInstructions,
-                    ingredients = ingredients,
-                    measures = measures,
-                    strDrinkThumb = strDrinkThumb
-                )
-
-                drinksList.add(drink)
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    isLoading.value = false
+                    errorMessage.value = "Error fetching data"
+                }
             }
-
-            _drinks.postValue(drinksList)
-        } catch (e: Exception) {
-            Log.e("MainViewModel", "Error parsing drinks response: ${e.message}")
         }
     }
+    // Clear the results when the query is empty
+    fun clearSearchResults() {
+        drinksList.value = emptyList()
+    }
+    // Method to fetch the details of a specific drink by its name
+    fun getDrinkDetails(drinkName: String) {
+        val formattedName = drinkName.replace(" ", "_") // Replace spaces with underscores
+        val url = "https://www.thecocktaildb.com/api/json/v1/1/search.php?s=$formattedName"
 
-    // Fetch a random drink from the API
-    fun fetchRandomDrink() {
-        CoroutineScope(Dispatchers.IO).launch {
+        // Make network request to fetch drink details
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val url = URL("https://www.thecocktaildb.com/api/json/v1/1/random.php")
-                val urlConnection = url.openConnection() as HttpURLConnection
-                urlConnection.requestMethod = "GET"
-                urlConnection.connect()
+                val request = Request.Builder().url(url).build()
+                val response = client.newCall(request).execute()
 
-                val responseCode = urlConnection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    val reader = BufferedReader(InputStreamReader(urlConnection.inputStream))
-                    val response = StringBuilder()
-                    var line: String?
+                if (response.isSuccessful) {
+                    val responseData = response.body?.string() ?: ""
+                    val jsonResponse = JSONObject(responseData)
 
-                    while (reader.readLine().also { line = it } != null) {
-                        response.append(line)
+                    val drinksArray = jsonResponse.optJSONArray("drinks")
+                    if (drinksArray != null && drinksArray.length() > 0) {
+                        val drinkJson = drinksArray.getJSONObject(0)
+
+                        // Map the response to the Drink data class
+                        val ingredients = mutableListOf<String?>()
+                        val measures = mutableListOf<String?>()
+
+                        for (i in 1..15) {
+                            ingredients.add(drinkJson.optString("strIngredient$i"))
+                            measures.add(drinkJson.optString("strMeasure$i"))
+                        }
+
+                        val drink = Drink(
+                            idDrink = drinkJson.optString("idDrink"),
+                            strDrink = drinkJson.optString("strDrink"),
+                            strDrinkThumb = drinkJson.optString("strDrinkThumb"),
+                            strCategory = drinkJson.optString("strCategory"),
+                            strInstructions = drinkJson.optString("strInstructions"),
+                            ingredients = ingredients,
+                            measures = measures
+                        )
+
+                        // Post the drink details back to the UI thread
+                        withContext(Dispatchers.Main) {
+                            drinkDetails.value = drink
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            errorMessage.value = "No details found for the drink"
+                        }
                     }
-
-                    val responseBody = response.toString()
-                    parseRandomDrinkResponse(responseBody)
                 } else {
-                    Log.e("MainViewModel", "Error fetching random drink: $responseCode")
+                    // Handle unsuccessful response
+                    withContext(Dispatchers.Main) {
+                        errorMessage.value = "Error: ${response.code}"
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("MainViewModel", "Error fetching random drink: ${e.message}")
-            }
-        }
-    }
-
-    private fun parseRandomDrinkResponse(responseBody: String) {
-        try {
-            val jsonObject = JSONObject(responseBody)
-            val drinksArray = jsonObject.getJSONArray("drinks")
-
-            if (drinksArray.length() > 0) {
-                val drinkObject = drinksArray.getJSONObject(0)
-
-                val idDrink = drinkObject.getString("idDrink")
-                val strCategory = drinkObject.optString("strCategory", null)
-                val strDrink = drinkObject.getString("strDrink")
-                val strInstructions = drinkObject.optString("strInstructions", null)
-                val strDrinkThumb = drinkObject.getString("strDrinkThumb")
-
-                val ingredients = mutableListOf<String>()
-                val measures = mutableListOf<String>()
-                for (j in 1..15) {
-                    val ingredient = drinkObject.optString("strIngredient$j", null)
-                    val measure = drinkObject.optString("strMeasure$j", null)
-
-                    if (ingredient != null) {
-                        ingredients.add(ingredient)
-                        measures.add(measure ?: "")
-                    }
+                // Handle network errors
+                withContext(Dispatchers.Main) {
+                    errorMessage.value = "Error fetching details"
                 }
-
-                val drink = Drink(
-                    idDrink = idDrink,
-                    strCategory = strCategory,
-                    strDrink = strDrink,
-                    strInstructions = strInstructions,
-                    ingredients = ingredients,
-                    measures = measures,
-                    strDrinkThumb = strDrinkThumb
-                )
-
-                _randomDrink.postValue(drink)
             }
-        } catch (e: Exception) {
-            Log.e("MainViewModel", "Error parsing random drink response: ${e.message}")
         }
     }
 }
