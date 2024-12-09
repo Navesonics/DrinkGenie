@@ -16,6 +16,7 @@ import com.jbsolutions.drinkgenieapp.model.Drink
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.auth.FirebaseAuth
 import com.jbsolutions.drinkgenieapp.model.FavoriteDrink
+import kotlinx.coroutines.tasks.await
 
 class DrinkViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -133,41 +134,46 @@ class DrinkViewModel(application: Application) : AndroidViewModel(application) {
             _favoriteDrinks.value = emptyList()
             return
         }
-        db.collection("favorites")
-            .whereEqualTo("userId", userId)
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                // Map the drink data from Firestore documents
-                val favoriteDrinks = querySnapshot.documents.mapNotNull { document ->
-                    val drinkName = document.getString("drinkName")
-                    val drinkThumb = document.getString("drinkThumb")
-                    val drinkId = document.getString("drinkID")
-                    val drinkCategory = document.getString("category")
-                    val drinkInstruction = document.getString("instructions")  // Fetching instructions
-                    val drinkMeasures = document.get("measures") as? List<String> ?: emptyList()
-                    val drinkIngredients = document.get("ingredients") as? List<String> ?: emptyList()
-                    if (drinkName != null && drinkThumb != null) {
-                        // Create a Drink object with ingredients and instructions
-                        Drink(
-                            strDrink = drinkName,
-                            strDrinkThumb = drinkThumb,
-                            strCategory = drinkCategory ?: "",  // Default to empty string if null
-                            strInstructions = drinkInstruction ?: "",  // Default to empty string if null
-                            ingredients = drinkIngredients,  // Parse ingredients if available
-                            measures = drinkMeasures,  // Parse measures if available
-                            idDrink = drinkId
-                        )
-                    } else {
-                        null
+
+        viewModelScope.launch {
+            try {
+                val favoriteDrinks = withContext(Dispatchers.IO) {
+                    val snapshot = db.collection("favorites")
+                        .whereEqualTo("userId", userId)
+                        .get()
+                        .await() // Using the extension function for coroutine support
+                    snapshot.documents.mapNotNull { document ->
+                        val drinkName = document.getString("drinkName")
+                        val drinkThumb = document.getString("drinkThumb")
+                        val drinkId = document.getString("drinkID")
+                        val drinkCategory = document.getString("category")
+                        val drinkInstruction = document.getString("instructions")
+                        val drinkMeasures = document.get("measures") as? List<String> ?: emptyList()
+                        val drinkIngredients = document.get("ingredients") as? List<String> ?: emptyList()
+
+                        if (drinkName != null && drinkThumb != null) {
+                            Drink(
+                                strDrink = drinkName,
+                                strDrinkThumb = drinkThumb,
+                                strCategory = drinkCategory ?: "",
+                                strInstructions = drinkInstruction ?: "",
+                                ingredients = drinkIngredients,
+                                measures = drinkMeasures,
+                                idDrink = drinkId
+                            )
+                        } else {
+                            null
+                        }
                     }
                 }
-
-                _favoriteDrinks.value = favoriteDrinks // Update the LiveData with the list of favorite drinks
+                _favoriteDrinks.value = favoriteDrinks
+            } catch (e: Exception) {
+                _favoriteDrinks.value = emptyList()
+                Log.e("DrinkViewModel", "Error fetching favorite drinks: ${e.message}")
             }
-            .addOnFailureListener {
-                _favoriteDrinks.value = emptyList() // Set an empty list on failure
-            }
+        }
     }
+
 
     fun removeFromFavorites(drinkId: String) {
         val userId = auth.currentUser?.uid
@@ -188,6 +194,7 @@ class DrinkViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
     }
+
     // Method to fetch the details of a specific drink by its name
      fun getDrinkDetails(drinkName: String) {
         val formattedName = drinkName.replace(" ", "_") // Replace spaces with underscores
@@ -324,42 +331,55 @@ class DrinkViewModel(application: Application) : AndroidViewModel(application) {
             }
     }
 
-    // Add or remove a drink from favorites
-    fun toggleFavorite(drinkId: String, drinkName: String, drinkThumb: String, category: String, instructions: String, ingredients: List<String?>, measures: List<String?> ) {
-        val userId = auth.currentUser?.uid
-        if (userId == null) {
-            return
-        }
-        db.collection("favorites")
-            .whereEqualTo("userId", userId)
-            .whereEqualTo("drinkId", drinkId)
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                if (querySnapshot.documents.isNotEmpty()) {
+    fun toggleFavorite(
+        drinkId: String,
+        drinkName: String,
+        drinkThumb: String,
+        category: String,
+        instructions: String,
+        ingredients: List<String?>,
+        measures: List<String?>
+    ) {
+        val userId = auth.currentUser?.uid ?: return
+
+        viewModelScope.launch {
+            try {
+                val existingDocument = withContext(Dispatchers.IO) {
+                    db.collection("favorites")
+                        .whereEqualTo("userId", userId)
+                        .whereEqualTo("drinkId", drinkId)
+                        .get()
+                        .await()
+                }
+
+                if (existingDocument.documents.isNotEmpty()) {
                     // If the drink is already a favorite, remove it
-                    querySnapshot.documents.first().reference.delete()
-                        .addOnSuccessListener {
-                            _isFavorite.value = false
-                        }
+                    withContext(Dispatchers.IO) {
+                        existingDocument.documents.first().reference.delete().await()
+                    }
+                    _isFavorite.value = false
                 } else {
                     // If it's not a favorite, add it
-                    val favoriteDrink = FavoriteDrink(
-                        userId = userId,
-                        drinkId = drinkId,
-                        drinkName = drinkName,
-                        drinkThumb = drinkThumb,
-                        category = category,
-                        instructions = instructions,
-                        ingredients = ingredients,
-                        measures = measures
+                    val favoriteDrink = mapOf(
+                        "userId" to userId,
+                        "drinkId" to drinkId,
+                        "drinkName" to drinkName,
+                        "drinkThumb" to drinkThumb,
+                        "category" to category,
+                        "instructions" to instructions,
+                        "ingredients" to ingredients,
+                        "measures" to measures
                     )
-                    db.collection("favorites")
-                        .add(favoriteDrink)
-                        .addOnSuccessListener {
-                            _isFavorite.value = true
-                        }
+                    withContext(Dispatchers.IO) {
+                        db.collection("favorites").add(favoriteDrink).await()
+                    }
+                    _isFavorite.value = true
                 }
+            } catch (e: Exception) {
+                Log.e("DrinkViewModel", "Error toggling favorite: ${e.message}")
             }
+        }
     }
+
 
 }

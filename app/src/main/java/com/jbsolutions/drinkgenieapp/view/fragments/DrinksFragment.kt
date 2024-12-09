@@ -14,7 +14,6 @@ import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
@@ -25,13 +24,11 @@ import com.jbsolutions.drinkgenieapp.databinding.FragmentDrinksBinding
 import com.jbsolutions.drinkgenieapp.model.Drink
 import com.jbsolutions.drinkgenieapp.view.adapters.DrinkAdapter
 import com.jbsolutions.drinkgenieapp.viewmodels.DrinkViewModel
-import kotlin.math.log
 
 class DrinksFragment : Fragment() {
 
     private lateinit var binding: FragmentDrinksBinding
     private val drinkViewModel: DrinkViewModel by viewModels()
-    private var chosenDrink: Drink? = null
     private lateinit var drinkAdapter: DrinkAdapter
 
     override fun onCreateView(
@@ -104,7 +101,7 @@ class DrinksFragment : Fragment() {
         }
 
         // Set initial drinks on fragment load (optional, can be removed if data is always fetched via search)
-        drinkViewModel.fetchDrinks("", "Name") // Load drinks by default based on "Name"
+        drinkViewModel.fetchDrinks("Margarita", "Name") // Load drinks by default based on "Name"
 
         return binding.root
     }

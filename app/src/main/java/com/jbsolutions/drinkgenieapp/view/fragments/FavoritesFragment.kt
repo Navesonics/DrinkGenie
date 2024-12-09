@@ -12,13 +12,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -26,7 +22,6 @@ import com.jbsolutions.drinkgenieapp.R
 import com.jbsolutions.drinkgenieapp.model.Drink
 import com.jbsolutions.drinkgenieapp.view.adapters.DrinkAdapter
 import com.jbsolutions.drinkgenieapp.viewmodels.DrinkViewModel
-import kotlinx.coroutines.launch
 
 class FavoritesFragment : Fragment() {
 
@@ -39,19 +34,12 @@ class FavoritesFragment : Fragment() {
         val view = inflater.inflate(R.layout.fragment_favorites, container, false)
 
 
-        drinkAdapter = DrinkAdapter(
-            emptyList(),
-            { drink ->
-                // Launch a coroutine in the lifecycleScope if inside Fragment/Activity
-                lifecycleScope.launch {
-                    showDrinkDetails(drink)  // Show details when a drink is clicked
-                }
-            },
-            { drink ->
-                // Handle unfavorite action if drink has a non-null idDrink
-                drink.idDrink?.let { drinkViewModel.removeFromFavorites(it) }  // Handle unfavorite action when the unfavorite icon is clicked
-            }
-        )
+        // Initialize the adapter with both itemClick and unfavoriteClick callbacks
+        drinkAdapter = DrinkAdapter(emptyList(), { drink ->
+            showDrinkDetails(drink)  // Show details when a drink is clicked
+        }, { drink ->
+            drink.idDrink?.let { drinkViewModel.removeFromFavorites(it) }  // Handle unfavorite action when the unfavorite icon is clicked
+        })
 
 
         // Fetch favorite drinks for the logged-in user
@@ -86,13 +74,10 @@ class FavoritesFragment : Fragment() {
         return view
     }
 
-    private suspend fun showDrinkDetails(drink: Drink) {
+    private fun showDrinkDetails(drink: Drink) {
         drink.idDrink?.let { drinkViewModel.checkIfFavorite(it) }
+
         val dialogBuilder = AlertDialog.Builder(requireContext())
-
-        Log.d("DrinksFragment", "Drinks List Updated: $drink")
-
-
 
         // Create a layout to hold all views
         val layout = LinearLayout(requireContext()).apply {
@@ -131,7 +116,7 @@ class FavoritesFragment : Fragment() {
 
         // Add a favorite icon (Star icon)
         val favoriteIcon = ImageView(requireContext()).apply {
-            setImageResource(R.drawable.ic_favorite_filled)  // Default as unfilled star
+            setImageResource(R.drawable.ic_favorite)  // Default as unfilled star
             layoutParams = LinearLayout.LayoutParams(
                 100, 100
             ).apply {
@@ -158,17 +143,9 @@ class FavoritesFragment : Fragment() {
                         }
                     }
                 }
-
             }
         }
 
-        // Observe the favorite status from the ViewModel
-        drinkViewModel.isFavorite.observe(viewLifecycleOwner, Observer { isFavorite ->
-            val iconRes = if (isFavorite) R.drawable.ic_favorite_filled else R.drawable.ic_favorite
-            favoriteIcon.setImageResource(iconRes)  // Update the icon based on favorite status
-        })
-
-        container.addView(favoriteIcon)
 
         // Add Name and Category Text
         val nameTextView = TextView(requireContext()).apply {
