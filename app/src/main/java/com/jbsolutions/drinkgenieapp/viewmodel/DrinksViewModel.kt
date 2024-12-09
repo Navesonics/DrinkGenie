@@ -113,7 +113,7 @@ class DrinkViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     withContext(Dispatchers.Main) {
                         isLoading.value = false
-                        errorMessage.value = "Error: ${response.code} Server is Busy"
+                        errorMessage.value = "Server is Busy. Please wait then try again."
                     }
                 }
             } catch (e: Exception) {
