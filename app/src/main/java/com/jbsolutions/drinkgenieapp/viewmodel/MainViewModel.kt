@@ -22,8 +22,8 @@ class MainViewModel : ViewModel() {
     private val _categories = MutableLiveData<List<Category>>()
     val categories: LiveData<List<Category>> get() = _categories
 
-    private val _drinks = MutableLiveData<List<Drink>>()
-    val drinks: LiveData<List<Drink>> get() = _drinks
+    private val _drinks = MutableLiveData<List<Drink>?>()
+    val drinks: MutableLiveData<List<Drink>?> get() = _drinks
 
     private val _randomDrink = MutableLiveData<Drink>()
     val randomDrink: LiveData<Drink> get() = _randomDrink
@@ -192,10 +192,8 @@ class MainViewModel : ViewModel() {
                     val ingredient = drinkObject.optString("strIngredient$j", null)
                     val measure = drinkObject.optString("strMeasure$j", null)
 
-                    if (ingredient != null) {
-                        ingredients.add(ingredient)
-                        measures.add(measure ?: "")
-                    }
+                    ingredients.add(ingredient)
+                    measures.add(measure ?: "")
                 }
 
                 val drink = Drink(
