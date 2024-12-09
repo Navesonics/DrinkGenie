@@ -20,6 +20,10 @@ class AuthViewModel : ViewModel() {
     private val _profileUpdateResult = MutableLiveData<Pair<Boolean, String?>>()
     val profileUpdateResult: LiveData<Pair<Boolean, String?>> get() = _profileUpdateResult
 
+    // LiveData for profile data
+    private val _profileData = MutableLiveData<Pair<Boolean, Map<String, Any>?>>()
+    val profileData: LiveData<Pair<Boolean, Map<String, Any>?>> get() = _profileData
+
     // Login method
     fun login(email: String, password: String) {
         authRepository.login(email, password) { success, message ->
@@ -38,6 +42,17 @@ class AuthViewModel : ViewModel() {
     fun updateUserProfile(uid: String, name: String?, bio: String?, profilePictureUrl: String?) {
         authRepository.updateUserProfile(uid, name, bio, profilePictureUrl) { success, message ->
             _profileUpdateResult.postValue(Pair(success, message))
+        }
+    }
+
+    // Fetch user profile data
+    fun fetchUserProfile(uid: String) {
+        authRepository.getUserProfile(uid) { success, data, error ->
+            if (success) {
+                _profileData.postValue(Pair(true, data))
+            } else {
+                _profileData.postValue(Pair(false, null))
+            }
         }
     }
 }

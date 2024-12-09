@@ -76,4 +76,20 @@ class AuthRepository {
                 callback(false, exception.message)
             }
     }
+
+    // AuthRepository.kt
+    fun getUserProfile(uid: String, callback: (Boolean, Map<String, Any>?, String?) -> Unit) {
+        firestore.collection("users").document(uid).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    callback(true, document.data, null)
+                } else {
+                    callback(false, null, "User data not found.")
+                }
+            }
+            .addOnFailureListener { exception ->
+                callback(false, null, exception.message)
+            }
+    }
+
 }
