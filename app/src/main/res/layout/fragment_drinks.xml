@@ -78,29 +78,6 @@
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
-        <!-- View at the bottom to show drink details and instructions -->
-        <LinearLayout
-            android:id="@+id/drinkDetailsLayout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingTop="16dp"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/drinkName"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@{drink.strDrink}" /> <!-- Bind to drink's name -->
-
-            <!-- Add other UI elements to bind drink properties, e.g. ingredients -->
-            <TextView
-                android:id="@+id/drinkInstructions"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@{drink.strInstructions}"
-                android:textSize="16sp" />
-        </LinearLayout>
 
     </LinearLayout>
 

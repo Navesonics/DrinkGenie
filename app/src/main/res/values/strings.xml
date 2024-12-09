@@ -4,5 +4,6 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="cocktail_image">Cocktail Image</string>
     <string name="error_empty_query">Please enter a search term.</string>
+    <string name="favorites">Favorites</string>
     <color name="gray">#808080</color>
 </resources>

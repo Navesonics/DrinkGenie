@@ -45,7 +45,11 @@ class TabLayoutFragment : Fragment() {
                         Toast.makeText(context, "Drinks tab selected", Toast.LENGTH_SHORT).show()
                     }
                     2 -> {
-                        // Handle "Favorites" tab selection
+                        // Favorites tab selected: Show FavoritesFragment
+                        val favoritesFragment = FavoritesFragment()
+                        val transaction = requireFragmentManager().beginTransaction()
+                        transaction.replace(R.id.fragment_container, favoritesFragment)
+                        transaction.commit()
                         Toast.makeText(context, "Favorites tab selected", Toast.LENGTH_SHORT).show()
                     }
                     3 -> {

@@ -6,113 +6,93 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.SearchView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.jbsolutions.drinkgenieapp.R
-import com.jbsolutions.drinkgenieapp.databinding.FragmentDrinksBinding
 import com.jbsolutions.drinkgenieapp.model.Drink
 import com.jbsolutions.drinkgenieapp.view.adapters.DrinkAdapter
 import com.jbsolutions.drinkgenieapp.viewmodels.DrinkViewModel
-import kotlin.math.log
+import kotlinx.coroutines.launch
 
-class DrinksFragment : Fragment() {
+class FavoritesFragment : Fragment() {
 
-    private lateinit var binding: FragmentDrinksBinding
-    private val drinkViewModel: DrinkViewModel by viewModels()
-    private var chosenDrink: Drink? = null
     private lateinit var drinkAdapter: DrinkAdapter
-
+    private val drinkViewModel: DrinkViewModel by viewModels()
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        binding = FragmentDrinksBinding.inflate(inflater, container, false)
-
-        // Set up RecyclerView
-        val layoutManager = LinearLayoutManager(requireContext())
-        binding.drinksRecyclerView.layoutManager = layoutManager
-
-        // Spinner setup for filter options
-        val filterOptions = listOf("Name")
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, filterOptions)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spinnerFilter.adapter = adapter
-
-        // Initialize the adapter with both itemClick and unfavoriteClick callbacks
-        drinkAdapter = DrinkAdapter(emptyList(), { drink ->
-            showDrinkDetails(drink)  // Show details when a drink is clicked
-        }, { drink ->
-            drink.idDrink?.let { drinkViewModel.removeFromFavorites(it) }  // Handle unfavorite action when the unfavorite icon is clicked
-        })
-
-// Set the adapter to the RecyclerView
-        binding.drinksRecyclerView.adapter = drinkAdapter
+        val view = inflater.inflate(R.layout.fragment_favorites, container, false)
 
 
-        // Observer for drinks list from ViewModel
-        drinkViewModel.drinksList.observe(viewLifecycleOwner, Observer { drinks ->
-            drinks?.let {
-                Log.d("DrinksFragment", "Updating RecyclerView with ${it.size} drinks")
-                drinkAdapter.updateDrinks(it) // Update the data in the adapter
-                binding.errorTextView.visibility = View.GONE  // Hide error if data is available
-            }
-        })
-
-        // Observer for loading state
-        drinkViewModel.isLoading.observe(viewLifecycleOwner, Observer { isLoading ->
-            binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
-        })
-
-        // Observer for error message
-        drinkViewModel.errorMessage.observe(viewLifecycleOwner, Observer { errorMessage ->
-            errorMessage?.let {
-                if (drinkViewModel.drinksList.value.isNullOrEmpty()) {
-                    binding.errorTextView.visibility = View.VISIBLE
-                    binding.errorTextView.text = it
+        drinkAdapter = DrinkAdapter(
+            emptyList(),
+            { drink ->
+                // Launch a coroutine in the lifecycleScope if inside Fragment/Activity
+                lifecycleScope.launch {
+                    showDrinkDetails(drink)  // Show details when a drink is clicked
                 }
+            },
+            { drink ->
+                // Handle unfavorite action if drink has a non-null idDrink
+                drink.idDrink?.let { drinkViewModel.removeFromFavorites(it) }  // Handle unfavorite action when the unfavorite icon is clicked
             }
+        )
+
+
+        // Fetch favorite drinks for the logged-in user
+        drinkViewModel.getFavoriteDrinks()
+
+
+        val recyclerView: RecyclerView = view.findViewById(R.id.recyclerViewFavorites)
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        recyclerView.adapter = drinkAdapter
+
+// Reference to the "No Favorites" message TextView
+        val noFavoritesMessage: TextView = view.findViewById(R.id.noFavoritesMessage)
+
+        // Observe favorite drinks LiveData
+        drinkViewModel.favoriteDrinks.observe(viewLifecycleOwner, Observer { _favoriteDrinks ->
+            Log.d("DrinksFragment", "${_favoriteDrinks} DRINKS")
+
+            // Check if the favorite drinks list is empty
+            if (_favoriteDrinks.isEmpty()) {
+                noFavoritesMessage.visibility = View.VISIBLE // Show "No Favorites"
+                recyclerView.visibility = View.GONE // Hide RecyclerView
+            } else {
+                noFavoritesMessage.visibility = View.GONE // Hide "No Favorites"
+                recyclerView.visibility = View.VISIBLE // Show RecyclerView
+            }
+
+            // Update the adapter with the favorite drinks
+            drinkAdapter.updateDrinks(_favoriteDrinks)
         })
 
-        // Handle search submit
-        // Replace the SearchView listener with a Button click listener
-        binding.searchButton.setOnClickListener {
-            // Get the query entered in the SearchView
-            val query = binding.searchView.query.toString().trim()
 
-            if (query.isNotEmpty()) {
-                // Get the selected filter option from the Spinner
-                val filter = binding.spinnerFilter.selectedItem.toString()
-
-                // Call the ViewModel's fetchDrinks method with the query and filter
-                drinkViewModel.fetchDrinks(query, filter)
-            } else {
-                // Optionally clear search results if the query is empty
-                drinkViewModel.clearSearchResults()
-            }
-        }
-
-        // Set initial drinks on fragment load (optional, can be removed if data is always fetched via search)
-        drinkViewModel.fetchDrinks("", "Name") // Load drinks by default based on "Name"
-
-        return binding.root
+        return view
     }
 
-    private fun showDrinkDetails(drink: Drink) {
+    private suspend fun showDrinkDetails(drink: Drink) {
         drink.idDrink?.let { drinkViewModel.checkIfFavorite(it) }
-
         val dialogBuilder = AlertDialog.Builder(requireContext())
+
+        Log.d("DrinksFragment", "Drinks List Updated: $drink")
+
+
 
         // Create a layout to hold all views
         val layout = LinearLayout(requireContext()).apply {
@@ -151,7 +131,7 @@ class DrinksFragment : Fragment() {
 
         // Add a favorite icon (Star icon)
         val favoriteIcon = ImageView(requireContext()).apply {
-            setImageResource(R.drawable.ic_favorite)  // Default as unfilled star
+            setImageResource(R.drawable.ic_favorite_filled)  // Default as unfilled star
             layoutParams = LinearLayout.LayoutParams(
                 100, 100
             ).apply {
@@ -178,6 +158,7 @@ class DrinksFragment : Fragment() {
                         }
                     }
                 }
+
             }
         }
 
@@ -263,7 +244,5 @@ class DrinksFragment : Fragment() {
         val alert = dialogBuilder.create()
         alert.show()
     }
-
-
-
 }
+

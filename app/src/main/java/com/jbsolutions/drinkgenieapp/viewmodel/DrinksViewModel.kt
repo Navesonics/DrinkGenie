@@ -1,7 +1,9 @@
 package com.jbsolutions.drinkgenieapp.viewmodels
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -11,15 +13,23 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import com.jbsolutions.drinkgenieapp.model.Drink
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
+import com.jbsolutions.drinkgenieapp.model.FavoriteDrink
 
 class DrinkViewModel(application: Application) : AndroidViewModel(application) {
 
-    val drinksList = MutableLiveData<List<Drink>>() // Change to List<Drink> instead of List<String>
+    val drinksList = MutableLiveData<List<Drink>>()
+
     val isLoading = MutableLiveData<Boolean>()
     val errorMessage = MutableLiveData<String>()
-    val drinkDetails = MutableLiveData<Drink?>()
-
     private val client = OkHttpClient()
+    private val _isFavorite = MutableLiveData<Boolean>()
+    val isFavorite: LiveData<Boolean> get() = _isFavorite
+    private val _favoriteDrinks = MutableLiveData<List<Drink>>()
+    val favoriteDrinks: LiveData<List<Drink>> get() = _favoriteDrinks
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
 
     // Fetch drinks based on query and filter
     fun fetchDrinks(query: String, filter: String) {
@@ -51,24 +61,49 @@ class DrinkViewModel(application: Application) : AndroidViewModel(application) {
                             val drinkName = drink.optString("strDrink")
                             val drinkId = drink.optString("idDrink")
                             val drinkThumb = drink.optString("strDrinkThumb")
+                            val drinkInstructions = drink.optString("strInstructions")
+                            val drinkCategory = drink.optString("strCategory")
+
+                            // Initialize lists for ingredients and measures
+                            val ingredients = mutableListOf<String>()
+                            val measures = mutableListOf<String>()
+
+                            // Loop through the ingredient keys (strIngredient1 to strIngredient15)
+                            for (j in 1..15) {
+                                val ingredientKey = "strIngredient$j"
+                                val measureKey = "strMeasure$j"
+
+                                val ingredient = drink.optString(ingredientKey)
+                                val measure = drink.optString(measureKey)
+
+                                if (!ingredient.isNullOrEmpty()) {
+                                    ingredients.add(ingredient)
+                                }
+                                if (!measure.isNullOrEmpty()) {
+                                    measures.add(measure)
+                                }
+                            }
 
                             // Create a Drink object and add it to the list
-                            drinks.add(Drink(
-                                idDrink = drinkId,
-                                strDrink = drinkName,
-                                strDrinkThumb = drinkThumb,
-                                strCategory = "",
-                                strInstructions = "",
-                                ingredients = emptyList(),
-                                measures = emptyList()
-                            ))
+                            drinks.add(
+                                Drink(
+                                    idDrink = drinkId,
+                                    strDrink = drinkName,
+                                    strDrinkThumb = drinkThumb,
+                                    strCategory = drinkCategory,
+                                    strInstructions = drinkInstructions,
+                                    ingredients = ingredients,
+                                    measures = measures
+                                )
+                            )
                         }
 
                         withContext(Dispatchers.Main) {
                             drinksList.value = drinks
                             isLoading.value = false
                         }
-                    } else {
+                    }
+                    else {
                         withContext(Dispatchers.Main) {
                             isLoading.value = false
                             errorMessage.value = "No drinks found"
@@ -77,7 +112,7 @@ class DrinkViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     withContext(Dispatchers.Main) {
                         isLoading.value = false
-                        errorMessage.value = "Error: ${response.code}"
+                        errorMessage.value = "Error: ${response.code} Server is Busy"
                     }
                 }
             } catch (e: Exception) {
@@ -92,14 +127,75 @@ class DrinkViewModel(application: Application) : AndroidViewModel(application) {
     fun clearSearchResults() {
         drinksList.value = emptyList()
     }
+    fun getFavoriteDrinks() {
+        val userId = auth.currentUser?.uid
+        if (userId == null) {
+            _favoriteDrinks.value = emptyList()
+            return
+        }
+        db.collection("favorites")
+            .whereEqualTo("userId", userId)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                // Map the drink data from Firestore documents
+                val favoriteDrinks = querySnapshot.documents.mapNotNull { document ->
+                    val drinkName = document.getString("drinkName")
+                    val drinkThumb = document.getString("drinkThumb")
+                    val drinkId = document.getString("drinkID")
+                    val drinkCategory = document.getString("category")
+                    val drinkInstruction = document.getString("instructions")  // Fetching instructions
+                    val drinkMeasures = document.get("measures") as? List<String> ?: emptyList()
+                    val drinkIngredients = document.get("ingredients") as? List<String> ?: emptyList()
+                    if (drinkName != null && drinkThumb != null) {
+                        // Create a Drink object with ingredients and instructions
+                        Drink(
+                            strDrink = drinkName,
+                            strDrinkThumb = drinkThumb,
+                            strCategory = drinkCategory ?: "",  // Default to empty string if null
+                            strInstructions = drinkInstruction ?: "",  // Default to empty string if null
+                            ingredients = drinkIngredients,  // Parse ingredients if available
+                            measures = drinkMeasures,  // Parse measures if available
+                            idDrink = drinkId
+                        )
+                    } else {
+                        null
+                    }
+                }
+
+                _favoriteDrinks.value = favoriteDrinks // Update the LiveData with the list of favorite drinks
+            }
+            .addOnFailureListener {
+                _favoriteDrinks.value = emptyList() // Set an empty list on failure
+            }
+    }
+
+    fun removeFromFavorites(drinkId: String) {
+        val userId = auth.currentUser?.uid
+        if (userId == null) {
+            return
+        }
+
+        db.collection("favorites")
+            .whereEqualTo("userId", userId)
+            .whereEqualTo("drinkId", drinkId)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                if (querySnapshot.documents.isNotEmpty()) {
+                    querySnapshot.documents.first().reference.delete()
+                        .addOnSuccessListener {
+                            getFavoriteDrinks() // Refresh the list after removal
+                        }
+                }
+            }
+    }
     // Method to fetch the details of a specific drink by its name
-    fun getDrinkDetails(drinkName: String) {
+     fun getDrinkDetails(drinkName: String) {
         val formattedName = drinkName.replace(" ", "_") // Replace spaces with underscores
         val url = "https://www.thecocktaildb.com/api/json/v1/1/search.php?s=$formattedName"
-
-        // Make network request to fetch drink details
+        Log.d("DrinksFragment", "${url} url")
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Make network request to fetch drinks in the background
                 val request = Request.Builder().url(url).build()
                 val response = client.newCall(request).execute()
 
@@ -108,49 +204,162 @@ class DrinkViewModel(application: Application) : AndroidViewModel(application) {
                     val jsonResponse = JSONObject(responseData)
 
                     val drinksArray = jsonResponse.optJSONArray("drinks")
-                    if (drinksArray != null && drinksArray.length() > 0) {
-                        val drinkJson = drinksArray.getJSONObject(0)
+                    Log.d("DrinksFragment", "Current List: $drinksArray")
+                    if (drinksArray != null) {
+                        val newDrinkList =
+                            mutableListOf<Drink>() // List to store new or updated drinks
+                        for (i in 0 until drinksArray.length()) {
+                            val drink = drinksArray.getJSONObject(i)
+                            val drinkName = drink.optString("strDrink")
+                            val drinkId = drink.optString("idDrink")
+                            val drinkThumb = drink.optString("strDrinkThumb")
+                            val drinkInstructions = drink.optString("strInstructions")
+                            val drinkCategory = drink.optString("strCategory")
 
-                        // Map the response to the Drink data class
-                        val ingredients = mutableListOf<String?>()
-                        val measures = mutableListOf<String?>()
+                            // Initialize lists for ingredients and measures
+                            val ingredients = mutableListOf<String>()
+                            val measures = mutableListOf<String>()
 
-                        for (i in 1..15) {
-                            ingredients.add(drinkJson.optString("strIngredient$i"))
-                            measures.add(drinkJson.optString("strMeasure$i"))
-                        }
+                            // Loop through the ingredient keys (strIngredient1 to strIngredient15)
+                            for (j in 1..15) {
+                                val ingredientKey = "strIngredient$j"
+                                val measureKey = "strMeasure$j"
 
-                        val drink = Drink(
-                            idDrink = drinkJson.optString("idDrink"),
-                            strDrink = drinkJson.optString("strDrink"),
-                            strDrinkThumb = drinkJson.optString("strDrinkThumb"),
-                            strCategory = drinkJson.optString("strCategory"),
-                            strInstructions = drinkJson.optString("strInstructions"),
-                            ingredients = ingredients,
-                            measures = measures
-                        )
+                                val ingredient = drink.optString(ingredientKey)
+                                val measure = drink.optString(measureKey)
 
-                        // Post the drink details back to the UI thread
-                        withContext(Dispatchers.Main) {
-                            drinkDetails.value = drink
+                                if (!ingredient.isNullOrEmpty()) {
+                                    ingredients.add(ingredient)
+                                }
+                                if (!measure.isNullOrEmpty()) {
+                                    measures.add(measure)
+                                }
+                            }
+
+                            // Create a Drink object
+                            val updatedDrink = Drink(
+                                idDrink = drinkId,
+                                strDrink = drinkName,
+                                strDrinkThumb = drinkThumb,
+                                strCategory = drinkCategory,
+                                strInstructions = drinkInstructions,
+                                ingredients = ingredients,
+                                measures = measures
+                            )
+
+
+                            // Use withContext to ensure UI updates happen on the main thread
+                            withContext(Dispatchers.Main) {
+
+                                val currentList =
+                                    (drinksList.value ?: mutableListOf()).toMutableList()
+                                Log.d("DrinksFragment", "Current List: $currentList")
+                                Log.d("DrinksFragment", "Drink ID: $drinkId")
+
+                                val existingDrinkIndex =
+                                    currentList.indexOfFirst { it.idDrink == drinkId }
+                                Log.d("DrinksFragment", "Existing Index: $existingDrinkIndex")
+
+                                if (existingDrinkIndex != -1) {
+
+                                    Log.d("DrinksFragment", "HERE!: $drinkId")
+
+                                    // Update the existing drink
+                                    currentList[existingDrinkIndex] = updatedDrink
+                                } else {
+                                    // Add the new drink
+                                    Log.d("DrinksFragment", "NOT HERE!: $drinkId")
+                                    currentList.add(updatedDrink)
+                                }
+
+                                // Update the LiveData value
+                                drinksList.postValue(currentList)
+                                Log.d("DrinksFragment", "Updated Drink List: ${drinksList.value}")
+                                isLoading.value = false
+                            }
                         }
                     } else {
+                        // Handle the case when no drinks are found
                         withContext(Dispatchers.Main) {
-                            errorMessage.value = "No details found for the drink"
+                            isLoading.value = false
+                            errorMessage.value = "No drinks found"
                         }
                     }
                 } else {
-                    // Handle unsuccessful response
+                    // Handle the case when the response is not successful
                     withContext(Dispatchers.Main) {
+                        isLoading.value = false
                         errorMessage.value = "Error: ${response.code}"
                     }
                 }
             } catch (e: Exception) {
-                // Handle network errors
+                // Handle any network or parsing exceptions
                 withContext(Dispatchers.Main) {
-                    errorMessage.value = "Error fetching details"
+                    isLoading.value = false
+                    errorMessage.value = "Error fetching data: ${e.message}"
                 }
             }
         }
     }
+
+
+    // Function to favorite a drink
+    // Check if a drink is a favorite
+    fun checkIfFavorite(drinkId: String) {
+        val userId = auth.currentUser?.uid
+        if (userId == null) {
+            _isFavorite.value = false
+            return
+        }
+
+        db.collection("favorites")
+            .whereEqualTo("userId", userId)
+            .whereEqualTo("drinkId", drinkId)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                _isFavorite.value = querySnapshot.documents.isNotEmpty()
+            }
+            .addOnFailureListener {
+                _isFavorite.value = false
+            }
+    }
+
+    // Add or remove a drink from favorites
+    fun toggleFavorite(drinkId: String, drinkName: String, drinkThumb: String, category: String, instructions: String, ingredients: List<String?>, measures: List<String?> ) {
+        val userId = auth.currentUser?.uid
+        if (userId == null) {
+            return
+        }
+        db.collection("favorites")
+            .whereEqualTo("userId", userId)
+            .whereEqualTo("drinkId", drinkId)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                if (querySnapshot.documents.isNotEmpty()) {
+                    // If the drink is already a favorite, remove it
+                    querySnapshot.documents.first().reference.delete()
+                        .addOnSuccessListener {
+                            _isFavorite.value = false
+                        }
+                } else {
+                    // If it's not a favorite, add it
+                    val favoriteDrink = FavoriteDrink(
+                        userId = userId,
+                        drinkId = drinkId,
+                        drinkName = drinkName,
+                        drinkThumb = drinkThumb,
+                        category = category,
+                        instructions = instructions,
+                        ingredients = ingredients,
+                        measures = measures
+                    )
+                    db.collection("favorites")
+                        .add(favoriteDrink)
+                        .addOnSuccessListener {
+                            _isFavorite.value = true
+                        }
+                }
+            }
+    }
+
 }

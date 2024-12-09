@@ -1,27 +1,38 @@
 package com.jbsolutions.drinkgenieapp.view.adapters
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.jbsolutions.drinkgenieapp.R
-import com.jbsolutions.drinkgenieapp.databinding.FragmentDrinksBinding
 import com.jbsolutions.drinkgenieapp.model.Drink
+import com.bumptech.glide.Glide
 
-class DrinkAdapter(private var drinks: List<Drink>, private val itemClick: (Drink) -> Unit) : RecyclerView.Adapter<DrinkAdapter.DrinkViewHolder>() {
+class DrinkAdapter(
+    private var drinks: List<Drink>,
+    private val itemClick: ((Drink) -> Unit),  // Make itemClick optional
+    private val unfavoriteClick: (Drink) -> Unit // Unfavorite callback
+) : RecyclerView.Adapter<DrinkAdapter.DrinkViewHolder>() {
 
-    // Create a ViewHolder class to hold the views for each item
+    // ViewHolder class for each drink item
     inner class DrinkViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val drinkName: TextView = itemView.findViewById(R.id.drinkName)
+        val drinkImage: ImageView = itemView.findViewById(R.id.drinkImage)
 
-        // Set up click listener for the item view
+        // Bind the data to the views
         fun bind(drink: Drink) {
             drinkName.text = drink.strDrink
+            Glide.with(itemView.context)
+                .load(drink.strDrinkThumb)  // Load drink image using Glide
+                .into(drinkImage)
+
             itemView.setOnClickListener {
-                itemClick(drink)
+                itemClick?.let { click -> click(drink) }  // Safely call itemClick if it's not null
             }
+
+
         }
     }
 
@@ -45,9 +56,7 @@ class DrinkAdapter(private var drinks: List<Drink>, private val itemClick: (Drin
 
     // Update the list of drinks in the adapter
     fun updateDrinks(newDrinks: List<Drink>) {
-        drinks = newDrinks
+        this.drinks = newDrinks
         notifyDataSetChanged() // Notify adapter that data has changed
     }
 }
-
-
